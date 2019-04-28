@@ -1,0 +1,76 @@
+#!/bin/bash
+
+set -euo pipefail
+
+if [[ $# -lt 2 ]]; then
+    echo Specify the nick and the minecraft version, eg. "playa 1.13.2" or "playa 1.12.2-forge"
+    exit 0
+fi
+
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd )" # folder where all logs and supporting files are kept. Defaults to the same folder this script is in
+cd "$DIR"
+
+# using these specific variables so they can be used inside GAME_ARGS sourced from $version_name.config
+auth_player_name=$1
+version_name=$2
+# static variables for the local offline run
+game_directory="."
+assets_root="assets"
+auth_uuid=0
+auth_access_token=0
+version_type=relase
+user_type=legacy
+launcher_name="minecraft-launcher"
+launcher_version="2.1.1349"
+
+if [[ ! -f versions/$version_name/$version_name.config ]]; then
+    if [[ $version_name == *-forge ]]; then
+        echo Downloading forge version $version_name...
+        ./get-forge-client.sh $version_name
+    else
+        echo Downloading mainline version $version_name...
+        ./get-minecraft-client.sh $version_name
+    fi
+    if [[ ! -f versions/$version_name/$version_name.config ]]; then
+        echo Download failed
+        exit 1
+    fi
+fi
+
+# configure
+. versions/$version_name/$version_name.config
+
+# Forge
+#VER=1.12.2-forge1.12.2-14.23.4.2707
+#JVMOPTS='-Xmx1G -XX:+UseConcMarkSweepGC -XX:+CMSIncrementalMode -XX:-UseAdaptiveSizePolicy -Xmn128M'
+#CLASSPATH="$HOME/.minecraft/libraries/net/minecraftforge/forge/1.12.2-14.23.4.2707/forge-1.12.2-14.23.4.2707.jar:$HOME/.minecraft/libraries/net/minecraft/launchwrapper/1.12/launchwrapper-1.12.jar:$HOME/.minecraft/libraries/org/ow2/asm/asm-all/5.2/asm-all-5.2.jar:$HOME/.minecraft/libraries/jline/jline/2.13/jline-2.13.jar:$HOME/.minecraft/libraries/com/typesafe/akka/akka-actor_2.11/2.3.3/akka-actor_2.11-2.3.3.jar:$HOME/.minecraft/libraries/com/typesafe/config/1.2.1/config-1.2.1.jar:$HOME/.minecraft/libraries/org/scala-lang/scala-actors-migration_2.11/1.1.0/scala-actors-migration_2.11-1.1.0.jar:$HOME/.minecraft/libraries/org/scala-lang/scala-compiler/2.11.1/scala-compiler-2.11.1.jar:$HOME/.minecraft/libraries/org/scala-lang/plugins/scala-continuations-library_2.11/1.0.2/scala-continuations-library_2.11-1.0.2.jar:$HOME/.minecraft/libraries/org/scala-lang/plugins/scala-continuations-plugin_2.11.1/1.0.2/scala-continuations-plugin_2.11.1-1.0.2.jar:$HOME/.minecraft/libraries/org/scala-lang/scala-library/2.11.1/scala-library-2.11.1.jar:$HOME/.minecraft/libraries/org/scala-lang/scala-parser-combinators_2.11/1.0.1/scala-parser-combinators_2.11-1.0.1.jar:$HOME/.minecraft/libraries/org/scala-lang/scala-reflect/2.11.1/scala-reflect-2.11.1.jar:$HOME/.minecraft/libraries/org/scala-lang/scala-swing_2.11/1.0.1/scala-swing_2.11-1.0.1.jar:$HOME/.minecraft/libraries/org/scala-lang/scala-xml_2.11/1.0.2/scala-xml_2.11-1.0.2.jar:$HOME/.minecraft/libraries/lzma/lzma/0.0.1/lzma-0.0.1.jar:$HOME/.minecraft/libraries/net/sf/jopt-simple/jopt-simple/5.0.3/jopt-simple-5.0.3.jar:$HOME/.minecraft/libraries/java3d/vecmath/1.5.2/vecmath-1.5.2.jar:$HOME/.minecraft/libraries/net/sf/trove4j/trove4j/3.0.3/trove4j-3.0.3.jar:$HOME/.minecraft/libraries/org/apache/maven/maven-artifact/3.5.3/maven-artifact-3.5.3.jar"
+#CLASSPATH="${CLASSPATH}:$HOME/.minecraft/libraries/com/mojang/patchy/1.1/patchy-1.1.jar:$HOME/.minecraft/libraries/oshi-project/oshi-core/1.1/oshi-core-1.1.jar:$HOME/.minecraft/libraries/net/java/dev/jna/jna/4.4.0/jna-4.4.0.jar:$HOME/.minecraft/libraries/net/java/dev/jna/platform/3.4.0/platform-3.4.0.jar:$HOME/.minecraft/libraries/com/ibm/icu/icu4j-core-mojang/51.2/icu4j-core-mojang-51.2.jar:$HOME/.minecraft/libraries/net/sf/jopt-simple/jopt-simple/5.0.3/jopt-simple-5.0.3.jar:$HOME/.minecraft/libraries/com/paulscode/codecjorbis/20101023/codecjorbis-20101023.jar:$HOME/.minecraft/libraries/com/paulscode/codecwav/20101023/codecwav-20101023.jar:$HOME/.minecraft/libraries/com/paulscode/libraryjavasound/20101123/libraryjavasound-20101123.jar:$HOME/.minecraft/libraries/com/paulscode/librarylwjglopenal/20100824/librarylwjglopenal-20100824.jar:$HOME/.minecraft/libraries/com/paulscode/soundsystem/20120107/soundsystem-20120107.jar:$HOME/.minecraft/libraries/io/netty/netty-all/4.1.9.Final/netty-all-4.1.9.Final.jar:$HOME/.minecraft/libraries/com/google/guava/guava/21.0/guava-21.0.jar:$HOME/.minecraft/libraries/org/apache/commons/commons-lang3/3.5/commons-lang3-3.5.jar:$HOME/.minecraft/libraries/commons-io/commons-io/2.5/commons-io-2.5.jar:$HOME/.minecraft/libraries/commons-codec/commons-codec/1.10/commons-codec-1.10.jar:$HOME/.minecraft/libraries/net/java/jinput/jinput/2.0.5/jinput-2.0.5.jar:$HOME/.minecraft/libraries/net/java/jutils/jutils/1.0.0/jutils-1.0.0.jar:$HOME/.minecraft/libraries/com/google/code/gson/gson/2.8.0/gson-2.8.0.jar:$HOME/.minecraft/libraries/com/mojang/authlib/1.5.25/authlib-1.5.25.jar:$HOME/.minecraft/libraries/com/mojang/realms/1.10.21/realms-1.10.21.jar:$HOME/.minecraft/libraries/org/apache/commons/commons-compress/1.8.1/commons-compress-1.8.1.jar:$HOME/.minecraft/libraries/org/apache/httpcomponents/httpclient/4.3.3/httpclient-4.3.3.jar:$HOME/.minecraft/libraries/commons-logging/commons-logging/1.1.3/commons-logging-1.1.3.jar:$HOME/.minecraft/libraries/org/apache/httpcomponents/httpcore/4.3.2/httpcore-4.3.2.jar:$HOME/.minecraft/libraries/it/unimi/dsi/fastutil/7.1.0/fastutil-7.1.0.jar:$HOME/.minecraft/libraries/org/apache/logging/log4j/log4j-api/2.8.1/log4j-api-2.8.1.jar:$HOME/.minecraft/libraries/org/apache/logging/log4j/log4j-core/2.8.1/log4j-core-2.8.1.jar:$HOME/.minecraft/libraries/org/lwjgl/lwjgl/lwjgl/2.9.4-nightly-20150209/lwjgl-2.9.4-nightly-20150209.jar:$HOME/.minecraft/libraries/org/lwjgl/lwjgl/lwjgl_util/2.9.4-nightly-20150209/lwjgl_util-2.9.4-nightly-20150209.jar:$HOME/.minecraft/libraries/com/mojang/text2speech/1.10.3/text2speech-1.10.3.jar:$HOME/.minecraft/versions/1.12.2/1.12.2.jar"
+#MAIN=net.minecraft.launchwrapper.Launch
+#TWEAKS='--tweakClass net.minecraftforge.fml.common.launcher.FMLTweaker --versionType Forge'
+
+# 1.12.2
+#VER=1.12.2
+#CLASSPATH="$HOME/.minecraft/libraries/com/mojang/patchy/1.1/patchy-1.1.jar:$HOME/.minecraft/libraries/oshi-project/oshi-core/1.1/oshi-core-1.1.jar:$HOME/.minecraft/libraries/net/java/dev/jna/jna/4.4.0/jna-4.4.0.jar:$HOME/.minecraft/libraries/net/java/dev/jna/platform/3.4.0/platform-3.4.0.jar:$HOME/.minecraft/libraries/com/ibm/icu/icu4j-core-mojang/51.2/icu4j-core-mojang-51.2.jar:$HOME/.minecraft/libraries/net/sf/jopt-simple/jopt-simple/5.0.3/jopt-simple-5.0.3.jar:$HOME/.minecraft/libraries/com/paulscode/codecjorbis/20101023/codecjorbis-20101023.jar:$HOME/.minecraft/libraries/com/paulscode/codecwav/20101023/codecwav-20101023.jar:$HOME/.minecraft/libraries/com/paulscode/libraryjavasound/20101123/libraryjavasound-20101123.jar:$HOME/.minecraft/libraries/com/paulscode/librarylwjglopenal/20100824/librarylwjglopenal-20100824.jar:$HOME/.minecraft/libraries/com/paulscode/soundsystem/20120107/soundsystem-20120107.jar:$HOME/.minecraft/libraries/io/netty/netty-all/4.1.9.Final/netty-all-4.1.9.Final.jar:$HOME/.minecraft/libraries/com/google/guava/guava/21.0/guava-21.0.jar:$HOME/.minecraft/libraries/org/apache/commons/commons-lang3/3.5/commons-lang3-3.5.jar:$HOME/.minecraft/libraries/commons-io/commons-io/2.5/commons-io-2.5.jar:$HOME/.minecraft/libraries/commons-codec/commons-codec/1.10/commons-codec-1.10.jar:$HOME/.minecraft/libraries/net/java/jinput/jinput/2.0.5/jinput-2.0.5.jar:$HOME/.minecraft/libraries/net/java/jutils/jutils/1.0.0/jutils-1.0.0.jar:$HOME/.minecraft/libraries/com/google/code/gson/gson/2.8.0/gson-2.8.0.jar:$HOME/.minecraft/libraries/com/mojang/authlib/1.5.25/authlib-1.5.25.jar:$HOME/.minecraft/libraries/com/mojang/realms/1.10.21/realms-1.10.21.jar:$HOME/.minecraft/libraries/org/apache/commons/commons-compress/1.8.1/commons-compress-1.8.1.jar:$HOME/.minecraft/libraries/org/apache/httpcomponents/httpclient/4.3.3/httpclient-4.3.3.jar:$HOME/.minecraft/libraries/commons-logging/commons-logging/1.1.3/commons-logging-1.1.3.jar:$HOME/.minecraft/libraries/org/apache/httpcomponents/httpcore/4.3.2/httpcore-4.3.2.jar:$HOME/.minecraft/libraries/it/unimi/dsi/fastutil/7.1.0/fastutil-7.1.0.jar:$HOME/.minecraft/libraries/org/apache/logging/log4j/log4j-api/2.8.1/log4j-api-2.8.1.jar:$HOME/.minecraft/libraries/org/apache/logging/log4j/log4j-core/2.8.1/log4j-core-2.8.1.jar:$HOME/.minecraft/libraries/org/lwjgl/lwjgl/lwjgl/2.9.4-nightly-20150209/lwjgl-2.9.4-nightly-20150209.jar:$HOME/.minecraft/libraries/org/lwjgl/lwjgl/lwjgl_util/2.9.4-nightly-20150209/lwjgl_util-2.9.4-nightly-20150209.jar:$HOME/.minecraft/libraries/com/mojang/text2speech/1.10.3/text2speech-1.10.3.jar:$HOME/.minecraft/versions/1.12.2/1.12.2.jar"
+#MAIN=net.minecraft.client.main.Main
+#TWEAKS='--versionType release'
+
+#JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64/jre/bin
+
+# in latest minecraft this should come from
+# jq -r  '[.arguments.jvm[] | strings] | join(" ") ' versions/1.13/1.13.json
+# and from jvm option matching arch x86 (i.e. -Xss1M)
+#JVMOPTS='-Xss1M -Djava.library.path=${natives_directory} -Dminecraft.launcher.brand=${launcher_name} -Dminecraft.launcher.version=${launcher_version} -Dlog4j.configurationFile=${LOG_CONFIG} -cp ${classpath}'
+
+# extra tunings to run better
+JVM_OPTS="$JVM_OPTS -Xmx2G -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M"
+
+#${JAVA_HOME}/
+java $JVM_OPTS $MAIN $GAME_ARGS
+#  --username $user \
+#  --version $VER \
+#  --gameDir . \
+#  --assetsDir assets \
+#  --assetIndex $ASSETINDEX \
+#  --accessToken 0 \
+#  --userType legacy \
+#  $TWEAKS
