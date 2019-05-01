@@ -8,7 +8,17 @@ Downloads and installs Minecraft version on demand, including all the appropriat
 
         ./start nick version
 
-## How to replicate it manually
+To get the minecraft icon and the desktop link clone [this repo](https://aur.archlinux.org/minecraft-launcher.git),
+Install the icon
+
+        sudo install -Dm644 minecraft-launcher.svg /usr/share/icons/hicolor/symbolic/apps/minecraft-launcher.svg
+
+change the desktop file and install locally
+
+        cp minecraft-launcher.desktop ~/.local/share/plasma_icons/
+
+
+## How to do the same manually
 
 * Run the java launcher
 * Login and start from the launcher. It will download all the new files for the new version.
