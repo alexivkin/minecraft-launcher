@@ -30,8 +30,8 @@ fi
 
 # find the proper java - 8 before 1.13, 11 after
 javas=$(update-alternatives --list java)
-java8=$(echo "$javas" | grep -m1 java-8)
-java11=$(echo "$javas" | grep -m1 java-11)
+java8=$(echo "$javas" | grep -m1 java-8 || true)
+java11=$(echo "$javas" | grep -m1 java-11 || true)
 version_slug=$(echo $MAINLINE_VERSION | cut -d . -f 2)
 if [[ $version_slug -le 12 ]]; then
     if [[ -z $java8 ]]; then
@@ -41,10 +41,11 @@ if [[ $version_slug -le 12 ]]; then
     JAVA=$java8
 else
     if [[ -z $java11 ]]; then
-        echo Need Java 11 to run $MAINLINE_VERSION
-        exit 1
+        echo Java 11 is recommended for run $MAINLINE_VERSION, but will use Java 8
+        JAVA=$java8
+    else
+        JAVA=$java11
     fi
-    JAVA=$java11
 fi
 
 VERSION_DETAILS=$(curl -s $VERSION_JSON)

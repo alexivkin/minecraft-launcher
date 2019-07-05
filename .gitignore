@@ -15,5 +15,5 @@ config/
 crash-reports/
 libraries.x/
 mods/
-pixel.dat
+pixel*.dat
 tv-cache/
