@@ -8,3 +8,12 @@ screenshots
 versions
 servers.dat
 *.bak
+
+# junk from mods
+Flan/
+config/
+crash-reports/
+libraries.x/
+mods/
+pixel.dat
+tv-cache/

@@ -1,7 +1,6 @@
 #!/bin/bash
 
 # get the latest version and build the latest
-
 set -euo pipefail
 
 if [[ $# -eq 0 ]]; then
@@ -18,6 +17,8 @@ else
     MAINLINE_VERSION=$1
 fi
 
+echo "Downloading mainline version $MAINLINE_VERSION..."
+
 MAINLINE_CLIENT_JAR="versions/$MAINLINE_VERSION/$MAINLINE_VERSION.jar"
 
 VERSION_JSON=$(curl -s $MAINLINE_VERSIONS_JSON | jq --arg VERSION "$MAINLINE_VERSION" -r '[.versions[]|select(.id == $VERSION)][0].url')
@@ -25,6 +26,25 @@ if [[ $VERSION_JSON == "null" ]]; then
     echo "No mainline version $MAINLINE_VERSION exists. Available versions are"
     curl -s $MAINLINE_VERSIONS_JSON | jq -r '.versions[]|select(.type == "release").id'
     exit 1
+fi
+
+# find the proper java - 8 before 1.13, 11 after
+javas=$(update-alternatives --list java)
+java8=$(echo "$javas" | grep java-8)
+java11=$(echo "$javas" | grep java-11)
+version_slug=$(echo $MAINLINE_VERSION | cut -d . -f 2)
+if [[ $version_slug -le 12 ]]; then
+    if [[ -z $java8 ]]; then
+        echo Need Java 8 to run $MAINLINE_VERSION
+        exit 1
+    fi
+    JAVA=$java8
+else
+    if [[ -z $java11 ]]; then
+        echo Need Java 11 to run $MAINLINE_VERSION
+        exit 1
+    fi
+    JAVA=$java11
 fi
 
 VERSION_DETAILS=$(curl -s $VERSION_JSON)
@@ -67,19 +87,19 @@ for lib in $(echo $VERSION_DETAILS | jq -rc '.libraries[]'); do
     lib_path=$(dirname $lib_name)
     lib_url=$(echo $lib | jq -r '.downloads.artifact.url')
     if [[ ! $lib_name == "libraries/null" && ! -f $lib_name ]]; then
-        allowed=true    # default if no rules are defined
+        allowed="allow"    # default if no rules are defined
         # check the rules for Linux
         rules=$(echo $lib | jq -rc '.rules')
         if [[ ! $rules == "null" ]]; then
-            allowed=false
+            allowed="disallow"
             for rule in $(echo $lib | jq -rc '.rules[]'); do
-                if [[ $(echo $rule | jq -r '.os.name') == "linux" ]]; then
-                    allowed=true
-                    break
+                # take the default or the linux specific rule
+                if [[ $(echo $rule | jq -r '.os.name') == "null" || $(echo $rule | jq -r '.os.name') == "linux" ]]; then
+                    allowed=$(echo $rule | jq -r '.action')
                 fi
             done
-            if [[ $allowed == "false" ]]; then
-                #echo "$lib_name is not for linux"
+            if [[ $allowed == "disallow" ]]; then
+                #echo "$lib_name is not for Linux"
                 continue
             fi
         fi
@@ -88,11 +108,31 @@ for lib in $(echo $VERSION_DETAILS | jq -rc '.libraries[]'); do
         curl -sSL -o $lib_name $lib_url
         echo "done"
     fi
+
+    # get the native libs and unpack
     native_linux=$(echo $lib | jq -rc '.natives.linux')
-    if [[ ! $native_linux == "null" ]]; then
-        native_linux_name="libraries/"$(echo $lib | jq -rc '.downloads.classifiers["'$native_linux'"].path')
-        native_linux_path=$(dirname $native_linux_name)
-        native_linux_url=$(echo $lib | jq -rc '.downloads.classifiers["'$native_linux'"].url')
+    native_linux_name="libraries/"$(echo $lib | jq -rc '.downloads.classifiers["'$native_linux'"].path')
+    native_linux_path=$(dirname $native_linux_name)
+    native_linux_url=$(echo $lib | jq -rc '.downloads.classifiers["'$native_linux'"].url')
+    #if [[ ! $native_linux == "null" ]]; then
+    # don't check for file existence - we want to unpack it if it's already downloaded
+    # && ! -f $native_linux_name
+    if [[ ! $native_linux_name == "libraries/null" ]]; then
+        allowed="allow"    # default if no rules are defined
+        # check the rules for Linux
+        rules=$(echo $lib | jq -rc '.rules')
+        if [[ ! $rules == "null" ]]; then
+            allowed="disallow"
+            for rule in $(echo $lib | jq -rc '.rules[]'); do
+                if [[ $(echo $rule | jq -r '.os.name') == "null" || $(echo $rule | jq -r '.os.name') == "linux" ]]; then
+                    allowed=$(echo $rule | jq -r '.action')
+                fi
+            done
+            if [[ $allowed == "disallow" ]]; then
+                continue
+            fi
+        fi
+        # download if needed
         if [[ ! -f $native_linux_name ]]; then
             echo -n "Downloading $native_linux_name native linux library ..."
             mkdir -p $native_linux_path
@@ -101,11 +141,12 @@ for lib in $(echo $VERSION_DETAILS | jq -rc '.libraries[]'); do
         fi
         native_so_path="versions/$MAINLINE_VERSION/$MAINLINE_VERSION-natives"
         # unpack natives even if the source jar has been downloaded, because natives are version specific
-        echo -n "Unpacking to $native_linux_name to $native_so_path..."
+        #echo -n "Unpacking to $native_linux_name to $native_so_path..."
         mkdir -p $native_so_path
         unzip -qn $native_linux_name -d $native_so_path # -n to never overwrite, -o to always
-        echo "done"
+        #echo "done"
     fi
+
 done
 
 # get asset objects
@@ -135,7 +176,8 @@ if [[ $GAME_ARGS == "null" ]]; then
 fi
 
 # in latest minecraft this should come from
-# from jvm option matching arch x86 (i.e. -Xss1M)
+# jq -r  '[.arguments.jvm[] | strings] | join(" ") ' versions/1.13/1.13.json
+# and from jvm option matching arch x86 (i.e. -Xss1M)
 # and from .logging.client.argument
 JVM_OPTS='-Xss1M -Djava.library.path=${natives_directory} -Dminecraft.launcher.brand=${launcher_name} -Dminecraft.launcher.version=${launcher_version} -Dlog4j.configurationFile=${log_path} -cp ${classpath}'
 
@@ -150,6 +192,7 @@ natives_directory="versions/$MAINLINE_VERSION/$MAINLINE_VERSION-natives"
 log_path="$LOG_CONFIG"
 classpath="${CP}$MAINLINE_CLIENT_JAR"
 # config lines
+JAVA="$JAVA"
 JVM_OPTS="$JVM_OPTS"
 GAME_ARGS="$GAME_ARGS"
 EOC
