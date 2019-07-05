@@ -158,30 +158,13 @@ for name in $(echo $VERSION_DETAILS | jq -r '.libraries[] | select(.clientreq or
     FORGE_CP="${FORGE_CP}$dest:"
 done
 
-
-# find the proper java - 8 before 1.13, 11 after
-javas=$(update-alternatives --list java)
-java8=$(echo "$javas" | grep java-8)
-java11=$(echo "$javas" | grep java-11)
-version_slug=$(echo $MAINLINE_VERSION | cut -d . -f 2)
-if [[ $version_slug -le 12 ]]; then
-    if [[ -z $java8 ]]; then
-        echo Need Java 8 to run $MAINLINE_VERSION
-        exit 1
-    fi
-    JAVA=$java8
-else
-    if [[ -z $java11 ]]; then
-        echo Need Java 11 to run $MAINLINE_VERSION
-        exit 1
-    fi
-    JAVA=$java11
-fi
-
 MAINLINE_CLIENT_JAR="versions/$MAINLINE_VERSION/$MAINLINE_VERSION.jar"
 # add Forge specific tweaks
 MAIN_JAR=$(echo $VERSION_DETAILS | jq -r '.mainClass')
-# get mainline classpath. Not using the "source" command because it will try to expand vars built into JVM_OPTS
+
+# Clone mainline config parts to forge.
+# Not using the "source" command because it will try to expand vars built into JVM_OPTS
+JAVA=$(cat versions/$MAINLINE_VERSION/$MAINLINE_VERSION.config | sed -n 's/JAVA="\(.*\)"/\1/p')
 CP=$(cat versions/$MAINLINE_VERSION/$MAINLINE_VERSION.config | sed -n 's/classpath="\(.*\)"/\1/p')
 LOG_CONFIG=$(cat versions/$MAINLINE_VERSION/$MAINLINE_VERSION.config | sed -n 's/log_path="\(.*\)"/\1/p')
 

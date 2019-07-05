@@ -30,8 +30,8 @@ fi
 
 # find the proper java - 8 before 1.13, 11 after
 javas=$(update-alternatives --list java)
-java8=$(echo "$javas" | grep java-8)
-java11=$(echo "$javas" | grep java-11)
+java8=$(echo "$javas" | grep -m1 java-8)
+java11=$(echo "$javas" | grep -m1 java-11)
 version_slug=$(echo $MAINLINE_VERSION | cut -d . -f 2)
 if [[ $version_slug -le 12 ]]; then
     if [[ -z $java8 ]]; then
