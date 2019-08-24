@@ -29,8 +29,8 @@ case $MAINLINE_VERSION in
       norm=${MAINLINE_VERSION}.0 ;;
 esac
 
-FORGE_VERSION=$(curl -fsSL $FORGE_VERSIONS_JSON | jq -r ".promos[\"$MAINLINE_VERSION-recommended\"]")
-if [[ $FORGE_VERSION == "null" ]]; then
+#FORGE_VERSION=$(curl -fsSL $FORGE_VERSIONS_JSON | jq -r ".promos[\"$MAINLINE_VERSION-recommended\"]")
+#if [[ $FORGE_VERSION == "null" ]]; then
     FORGE_VERSION=$(curl -fsSL $FORGE_VERSIONS_JSON | jq -r ".promos[\"$MAINLINE_VERSION-latest\"]")
     if [[ $FORGE_VERSION == "null" ]]; then
         FORGE_SUPPORTED_VERSIONS=$(curl -fsSL $FORGE_VERSIONS_JSON | jq -r '.promos| keys[] | rtrimstr("-latest") | rtrimstr("-recommended")' | sort -u)
@@ -38,7 +38,7 @@ if [[ $FORGE_VERSION == "null" ]]; then
         #curl -fsSL $FORGE_VERSIONS_JSON | jq -r '.promos | keys[]' | sed -r 's/(-latest|-recommended)//' | sort -u
         exit 2
     fi
-fi
+#fi
 
 # get mainline if we don't already have it
 if [[ ! -f versions/$MAINLINE_VERSION/$MAINLINE_VERSION.config ]]; then
