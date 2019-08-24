@@ -158,6 +158,8 @@ for name in $(echo $VERSION_DETAILS | jq -r '.libraries[] | select(.clientreq or
     FORGE_CP="${FORGE_CP}$dest:"
 done
 
+java8=$(echo "$javas" | grep -m1 java-8 || true)
+java11=$(echo "$javas" | grep -m1 java-11 || true)
 MAINLINE_CLIENT_JAR="versions/$MAINLINE_VERSION/$MAINLINE_VERSION.jar"
 # add Forge specific tweaks
 MAIN_JAR=$(echo $VERSION_DETAILS | jq -r '.mainClass')
