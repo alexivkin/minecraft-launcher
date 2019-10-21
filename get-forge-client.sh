@@ -226,7 +226,6 @@ cat > $CONFIG_FILE << EOC
 # Minecraft $MAINLINE_VERSION-forge
 VER="$shortForgeVersion aka $FORGE_VERSION"
 # static variables
-game_directory="."
 assets_root="../../assets" # assets are shared across all versions
 auth_uuid=0
 auth_access_token=0
