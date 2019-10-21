@@ -31,22 +31,23 @@ fi
 # find the proper java - 8 before 1.13, 11 after
 javas=$(update-alternatives --list java)
 java8=$(echo "$javas" | grep -m1 java-8 || true)
-java11=$(echo "$javas" | grep -m1 java-11 || true)
-version_slug=$(echo $MAINLINE_VERSION | cut -d . -f 2)
-if [[ $version_slug -le 12 ]]; then
+# require java8 since that's what is needed for forge at all versions
+#java11=$(echo "$javas" | grep -m1 java-11 || true)
+#version_slug=$(echo $MAINLINE_VERSION | cut -d . -f 2)
+#if [[ $version_slug -le 12 ]]; then
     if [[ -z $java8 ]]; then
-        echo Need Java 8 to run $MAINLINE_VERSION
+        echo "Need Java 8 to run" #$MAINLINE_VERSION
         exit 1
     fi
     JAVA=$java8
-else
-    if [[ -z $java11 ]]; then
-        echo Java 11 is recommended for run $MAINLINE_VERSION, but will use Java 8
-        JAVA=$java8
-    else
-        JAVA=$java11
-    fi
-fi
+#else
+#    if [[ -z $java11 ]]; then
+#        echo Java 11 is recommended for run $MAINLINE_VERSION, but will use Java 8
+#        JAVA=$java8
+#    else
+#        JAVA=$java11
+#    fi
+#fi
 
 VERSION_DETAILS=$(curl -s $VERSION_JSON)
 mkdir -p versions/$MAINLINE_VERSION
@@ -72,22 +73,25 @@ fi
 
 LOG_FILE=$(echo $VERSION_DETAILS | jq -r '.logging.client.file.id')
 if [[ ! $LOG_FILE == "null" ]]; then
-    LOG_CONFIG="assets/log_configs/$LOG_FILE"
+    #LOG_CONFIG="assets/log_configs/$LOG_FILE"
+    LOG_CONFIG="logging-$LOG_FILE"
     if [[ ! -f $LOG_CONFIG ]]; then
         echo -n "Downloading $LOG_CONFIG ..."
-        mkdir -p assets/log_configs
-        curl -sSL -o $LOG_CONFIG $(echo $VERSION_DETAILS | jq -r '.logging.client.file.url')
+        #mkdir -p assets/log_configs
+        curl -sSL -o "versions/$MAINLINE_VERSION/$LOG_CONFIG" $(echo $VERSION_DETAILS | jq -r '.logging.client.file.url')
         echo "done"
     fi
 fi
 
+lib_base="versions/$MAINLINE_VERSION/libraries"
+
 # get all the necessary libs for this client
 for lib in $(echo $VERSION_DETAILS | jq -rc '.libraries[]'); do
     #echo $lib
-    lib_name="libraries/"$(echo $lib | jq -r '.downloads.artifact.path')
+    lib_name="$lib_base/$(echo $lib | jq -r '.downloads.artifact.path')"
     lib_path=$(dirname $lib_name)
     lib_url=$(echo $lib | jq -r '.downloads.artifact.url')
-    if [[ ! $lib_name == "libraries/null" && ! -f $lib_name ]]; then
+    if [[ ! $lib_name == "$lib_base/null" && ! -f $lib_name ]]; then
         allowed="allow"    # default if no rules are defined
         # check the rules for Linux
         rules=$(echo $lib | jq -rc '.rules')
@@ -112,13 +116,13 @@ for lib in $(echo $VERSION_DETAILS | jq -rc '.libraries[]'); do
 
     # get the native libs and unpack
     native_linux=$(echo $lib | jq -rc '.natives.linux')
-    native_linux_name="libraries/"$(echo $lib | jq -rc '.downloads.classifiers["'$native_linux'"].path')
+    native_linux_name="$lib_base/$(echo $lib | jq -rc '.downloads.classifiers["'$native_linux'"].path')"
     native_linux_path=$(dirname $native_linux_name)
     native_linux_url=$(echo $lib | jq -rc '.downloads.classifiers["'$native_linux'"].url')
     #if [[ ! $native_linux == "null" ]]; then
     # don't check for file existence - we want to unpack it if it's already downloaded
     # && ! -f $native_linux_name
-    if [[ ! $native_linux_name == "libraries/null" ]]; then
+    if [[ ! $native_linux_name == "$lib_base/null" ]]; then
         allowed="allow"    # default if no rules are defined
         # check the rules for Linux
         rules=$(echo $lib | jq -rc '.rules')
@@ -186,12 +190,24 @@ CONFIG_FILE="versions/$MAINLINE_VERSION/$MAINLINE_VERSION.config"
 
 echo Creating bash config file $CONFIG_FILE
 cat > $CONFIG_FILE << EOC
+# Minecraft $MAINLINE_VERSION
 VER="$MAINLINE_VERSION"
+# static variables
+game_directory="."
+assets_root="../../assets" # assets are shared across all versions
+auth_uuid=0
+auth_access_token=0
+version_type=relase
+user_type=legacy
+launcher_name="minecraft-launcher"
+launcher_version="2.1.1349"
+# dynamic variables
+# paths are relative to versions/$MAINLINE_VERSION
 MAIN="$MAIN_JAR"
 assets_index_name="$ASSET_INDEX"
-natives_directory="versions/$MAINLINE_VERSION/$MAINLINE_VERSION-natives"
+natives_directory="$MAINLINE_VERSION-natives"
 log_path="$LOG_CONFIG"
-classpath="${CP}$MAINLINE_CLIENT_JAR"
+classpath="${CP}$(basename $MAINLINE_CLIENT_JAR)"
 # config lines
 JAVA="$JAVA"
 JVM_OPTS="$JVM_OPTS"

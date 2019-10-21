@@ -10,18 +10,9 @@ fi
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd )" # folder where all logs and supporting files are kept. Defaults to the same folder this script is in
 cd "$DIR"
 
-# using these specific variables so they can be used inside GAME_ARGS sourced from $version_name.config
+# setting these specific variables so they can be used inside GAME_ARGS sourced from $version_name.config
 auth_player_name=$1
 version_name=$2
-# static variables for the local offline run
-game_directory="."
-assets_root="assets"
-auth_uuid=0
-auth_access_token=0
-version_type=relase
-user_type=legacy
-launcher_name="minecraft-launcher"
-launcher_version="2.1.1349"
 
 if [[ ! -f versions/$version_name/$version_name.config ]]; then
     if [[ $version_name == *-forge ]]; then
@@ -36,7 +27,9 @@ if [[ ! -f versions/$version_name/$version_name.config ]]; then
 fi
 
 # configure
-. versions/$version_name/$version_name.config
+cd versions/$version_name/
+
+. $version_name.config
 
 # extra tunings to run better
 JVM_OPTS="$JVM_OPTS -Xmx2G -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M"

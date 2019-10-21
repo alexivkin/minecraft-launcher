@@ -46,9 +46,9 @@ if [[ ! -f versions/$MAINLINE_VERSION/$MAINLINE_VERSION.config ]]; then
 fi
 
 # temp bugfix workaround
-if [[ $FORGE_VERSION == "27.0.24" ]]; then
-    FORGE_VERSION="27.0.21"
-fi
+#if [[ $FORGE_VERSION == "27.0.24" ]]; then
+#    FORGE_VERSION="27.0.21"
+#fi
 
 normForgeVersion=$MAINLINE_VERSION-$FORGE_VERSION-$norm
 shortForgeVersion=$MAINLINE_VERSION-$FORGE_VERSION
@@ -58,22 +58,23 @@ FORGE_UNIVERSAL="forge-$shortForgeVersion-universal.jar"
 VERSION_DIR="versions/$MAINLINE_VERSION-forge"
 mkdir -p $VERSION_DIR
 
-if [[ ! -f $VERSION_DIR/$FORGE_UNIVERSAL ]]; then
-    echo "Downloading $normForgeVersion universal"
-    downloadUrl=http://files.minecraftforge.net/maven/net/minecraftforge/forge/$shortForgeVersion/forge-$shortForgeVersion-universal.jar
-    echo "$downloadUrl"
-    if ! curl -o $VERSION_DIR/$FORGE_UNIVERSAL -fsSL $downloadUrl; then
-        downloadUrl=http://files.minecraftforge.net/maven/net/minecraftforge/forge/$normForgeVersion/forge-$normForgeVersion-universal.jar
-        echo "...trying $downloadUrl"
+# for versions before 27 use the universal jar
+if [[ ${FORGE_VERSION%%.*} -lt 27 ]]; then
+    if [[ ! -f $VERSION_DIR/$FORGE_UNIVERSAL ]]; then
+        echo "Downloading $normForgeVersion universal"
+        downloadUrl=http://files.minecraftforge.net/maven/net/minecraftforge/forge/$shortForgeVersion/forge-$shortForgeVersion-universal.jar
+        echo "$downloadUrl"
         if ! curl -o $VERSION_DIR/$FORGE_UNIVERSAL -fsSL $downloadUrl; then
-            echo no url worked
-            exit 3
+            downloadUrl=http://files.minecraftforge.net/maven/net/minecraftforge/forge/$normForgeVersion/forge-$normForgeVersion-universal.jar
+            echo "...trying $downloadUrl"
+            if ! curl -o $VERSION_DIR/$FORGE_UNIVERSAL -fsSL $downloadUrl; then
+                echo no url worked
+                exit 3
+            fi
         fi
     fi
-fi
-
-# for versions 27 and onward (minecraft 1.14) download the installer
-if [[ ${FORGE_VERSION%%.*} -ge 27 ]]; then
+else
+    # for versions 27 and onward (minecraft 1.14) download the installer
     FORGE_INSTALLER="forge-$shortForgeVersion-installer.jar"
     if [[ ! -f $VERSION_DIR/$FORGE_INSTALLER ]]; then
         echo "Downloading $normForgeVersion installer"
@@ -97,7 +98,7 @@ fi
 #    jar xvf $FORGE_UNIVERSAL forge-$shortForgeVersion-universal.jar
 #fi
 
-libdir="libraries"
+lib_base="$VERSION_DIR/libraries"
 echo "Getting the libs for $shortForgeVersion ..."
 
 #rooturl="http://files.minecraftforge.net/maven" # from http://files.minecraftforge.net/mirror-brand.list
@@ -105,42 +106,71 @@ echo "Getting the libs for $shortForgeVersion ..."
 # version file moved into the installer after 1.12
 #if [[  -f $VERSION_DIR/$FORGE_INSTALLER ]]; then
 if [[ ${FORGE_VERSION%%.*} -ge 27 ]]; then
-    VERSION_DETAILS=$(unzip -qc $VERSION_DIR/$FORGE_INSTALLER version.json)
-else
     # stuff into a var for later use
+    VERSION_DETAILS=$(unzip -qc $VERSION_DIR/$FORGE_INSTALLER version.json)
+    # run the installer from a stub allowing the CLI use
+    pushd $VERSION_DIR > /dev/null
+    echo "{}" > launcher_profiles.json
+    echo "Compiling the client installer..."
+    javac -cp $FORGE_INSTALLER ../../ClientInstaller.java -d .
+    echo "Running the installer..."
+    if ! java -cp $FORGE_INSTALLER:. ClientInstaller > forge-installer.log ; then
+        echo "Forge client installation failed. Check forge-installer.log"
+        exit 1
+    fi
+    # cleanup
+    rm ClientInstaller.class
+    rm launcher_profiles.json
+    rm -rf versions # remove to avoid confusion. keep installer libraries around though in case we need to reinstall
+    popd > /dev/null
+    FORGE_CP="libraries/net/minecraftforge/forge/$shortForgeVersion/forge-$shortForgeVersion.jar:"
+else
     VERSION_DETAILS=$(unzip -qc $VERSION_DIR/$FORGE_UNIVERSAL version.json)
+    FORGE_CP="$FORGE_UNIVERSAL:"
 fi
 
-echo $VERSION_DETAILS > $VERSION_DIR/$MAINLINE_VERSION-forge-$FORGE_VERSION.json
+echo "$VERSION_DETAILS" > $VERSION_DIR/$MAINLINE_VERSION-forge-$FORGE_VERSION.json
 
 # get all the necessary libs for this forge server, starting with the forge itself
-FORGE_CP="$VERSION_DIR/$FORGE_UNIVERSAL:"
+#FORGE_CP="$VERSION_DIR/$FORGE_UNIVERSAL:"
 
 for name in $(echo $VERSION_DETAILS | jq -r '.libraries[] | select(.clientreq or .clientreq == null) | .name'); do
     # split the name up
     s=(${name//:/ })
-    # and rebuild it
     class=${s[0]}
     lib=${s[1]}
     ver=${s[2]}
-    file="$lib-$ver.jar"
-    path="${class//./\/}/$lib/$ver"
     # ignore the forge jar entry as we are keeping it in a different folder, and already added to FORGE_CP
     if [[ $class == "net.minecraftforge" && $lib == "forge" ]]; then
         continue
     fi
-    baseurl=$(echo $VERSION_DETAILS | jq -r '.libraries[] | select(.name=="'$name'") | .url')
-    if [[ $baseurl == "null" ]]; then
-        baseurl="https://libraries.minecraft.net/"
+    # get destination path
+    full_path=$(echo $VERSION_DETAILS | jq -r '.libraries[] | select(.name=="'$name'") | .downloads.artifact.path')
+    if [[ $full_path != "null" ]]; then
+        file=$(basename $full_path)
+        path=$(dirname $full_path)
+    else
+        file="$lib-$ver.jar"
+        path="${class//./\/}/$lib/$ver"
     fi
-    mkdir -p "$libdir/$path"
-    dest="$libdir/$path/$file"
+    # get source url
+    url=$(echo $VERSION_DETAILS | jq -r '.libraries[] | select(.name=="'$name'") | .downloads.artifact.url')
+    if [[ $url == "null" ]]; then
+        baseurl=$(echo $VERSION_DETAILS | jq -r '.libraries[] | select(.name=="'$name'") | .url')
+        if [[ $baseurl == "null" ]]; then
+            baseurl="https://libraries.minecraft.net/"
+        fi
+        url="$baseurl$path/$file"
+    fi
+    # create as needed
+    mkdir -p "$lib_base/$path"
+    dest="$lib_base/$path/$file"
     if [[ ! -f $dest ]]; then
-        echo "$baseurl$path/$file"
-        if ! curl -fsSL -o $dest "$baseurl$path/$file"; then
+        echo "$url"
+        if ! curl -fsSL -o $dest "$url"; then
             # get and unpack augmented pack200 file
-            echo "...trying $baseurl$path/$file.pack.xz"
-            if ! curl -fsSL -o $dest.pack.xz "$baseurl$path/$file.pack.xz"; then
+            echo "...trying $url.pack.xz"
+            if ! curl -fsSL -o $dest.pack.xz "$url.pack.xz"; then
                 echo "cant download"
                 exit 1
             fi
@@ -155,11 +185,11 @@ for name in $(echo $VERSION_DETAILS | jq -r '.libraries[] | select(.clientreq or
             rm $dest.pack
         fi
     fi
-    FORGE_CP="${FORGE_CP}$dest:"
+    #FORGE_CP="${FORGE_CP}$dest:"
+    # use relative library path
+    FORGE_CP="${FORGE_CP}libraries/$path/$file:"
 done
 
-java8=$(echo "$javas" | grep -m1 java-8 || true)
-java11=$(echo "$javas" | grep -m1 java-11 || true)
 MAINLINE_CLIENT_JAR="versions/$MAINLINE_VERSION/$MAINLINE_VERSION.jar"
 # add Forge specific tweaks
 MAIN_JAR=$(echo $VERSION_DETAILS | jq -r '.mainClass')
@@ -167,10 +197,13 @@ MAIN_JAR=$(echo $VERSION_DETAILS | jq -r '.mainClass')
 # Clone mainline config parts to forge.
 # Not using the "source" command because it will try to expand vars built into JVM_OPTS
 JAVA=$(cat versions/$MAINLINE_VERSION/$MAINLINE_VERSION.config | sed -n 's/JAVA="\(.*\)"/\1/p')
-CP=$(cat versions/$MAINLINE_VERSION/$MAINLINE_VERSION.config | sed -n 's/classpath="\(.*\)"/\1/p')
-LOG_CONFIG=$(cat versions/$MAINLINE_VERSION/$MAINLINE_VERSION.config | sed -n 's/log_path="\(.*\)"/\1/p')
+# rework the path so it points at the mainline right folder
+CP=$(cat versions/$MAINLINE_VERSION/$MAINLINE_VERSION.config | sed -n 's/classpath="\(.*\)"/\1/p' | sed -n "s|libraries/|../$MAINLINE_VERSION/libraries/|gp" | sed -n "s|$MAINLINE_VERSION.jar|../$MAINLINE_VERSION/$MAINLINE_VERSION.jar|p" )
 
-GAME_ARGS=$(echo $VERSION_DETAILS | jq -r '.minecraftArguments')
+LOG_CONFIG=$(cat versions/$MAINLINE_VERSION/$MAINLINE_VERSION.config | sed -n 's/log_path="\(.*\)"/\1/p')
+if [[ ! -f $VERSION_DIR/$LOG_CONFIG ]]; then
+    cp versions/$MAINLINE_VERSION/$LOG_CONFIG $VERSION_DIR/$LOG_CONFIG
+fi
 
 ASSET_INDEX=$(cat versions/$MAINLINE_VERSION/$MAINLINE_VERSION.json | jq -r '.assetIndex.id')
 #GAME_ARGS="$GAME_ARGS --tweakClass net.minecraftforge.fml.common.launcher.FMLTweaker --versionType Forge"
@@ -179,7 +212,8 @@ ASSET_INDEX=$(cat versions/$MAINLINE_VERSION/$MAINLINE_VERSION.json | jq -r '.as
 GAME_ARGS=$(echo $VERSION_DETAILS | jq -r '.minecraftArguments')
 if [[ $GAME_ARGS == "null" ]]; then
      # collect from game arguments
-    GAME_ARGS=$(echo $VERSION_DETAILS | jq -r  '[.arguments.game[] | strings] | join(" ")')
+    MAINLINE_GAME_ARGS=$(cat versions/$MAINLINE_VERSION/$MAINLINE_VERSION.config | sed -n 's/GAME_ARGS="\(.*\)"/\1/p')
+    GAME_ARGS="$MAINLINE_GAME_ARGS $(echo $VERSION_DETAILS | jq -r '[.arguments.game[] | strings] | join(" ")')"
 fi
 
 #LOG_FILE=$(echo $VERSION_DETAILS | jq -r '.logging.client.file.id')
@@ -187,14 +221,25 @@ JVM_OPTS='-Xss1M -Djava.library.path=${natives_directory} -Dminecraft.launcher.b
 
 CONFIG_FILE="$VERSION_DIR/$MAINLINE_VERSION-forge.config"
 
-echo Creating bash config file $CONFIG_FILE
+echo "Creating bash config file $CONFIG_FILE"
 cat > $CONFIG_FILE << EOC
-VER="$shortForgeVersion or $FORGE_VERSION"
+# Minecraft $MAINLINE_VERSION-forge
+VER="$shortForgeVersion aka $FORGE_VERSION"
+# static variables
+game_directory="."
+assets_root="../../assets" # assets are shared across all versions
+auth_uuid=0
+auth_access_token=0
+version_type=relase
+user_type=legacy
+launcher_name="minecraft-launcher"
+launcher_version="2.1.1349"
+# dynamic variables
+# paths are relative to $VERSION_DIR
 MAIN="$MAIN_JAR"
 assets_index_name="$ASSET_INDEX"
-natives_directory="versions/$MAINLINE_VERSION/$MAINLINE_VERSION-natives"
+natives_directory="../$MAINLINE_VERSION/$MAINLINE_VERSION-natives"
 log_path="$LOG_CONFIG"
-#classpath="$VERSION_DIR/$FORGE_UNIVERSAL:${FORGE_CP}${CP}"
 classpath="${FORGE_CP}${CP}"
 # config lines
 JAVA="$JAVA"

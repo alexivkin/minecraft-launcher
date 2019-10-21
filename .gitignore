@@ -1,26 +1,4 @@
-options.txt
 assets
-libraries
-logs
-resourcepacks
-saves
-screenshots
 versions
-servers.dat
-*.bak
-
-# junk from mods
-Flan/
-mods/
-pixel*.dat
-tv-cache/
-
-# Game code
 launcher_profiles.json
-optionsof.txt
-optionsshaders.txt
-shaderpacks/
-usercache.json
-usernamecache.json
-config/
-crash-reports/
+*.bak
