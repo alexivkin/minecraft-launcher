@@ -51,6 +51,7 @@ elif [[ $version_slug -le 17 ]]; then
 else
     if [[ -z $java17 ]]; then
         echo "Java 17 is required for mainline versions 1.18+. Only found these java versions: $javas"
+        exit 1
     else
         JAVA=$java17
     fi
