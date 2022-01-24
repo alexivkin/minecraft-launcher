@@ -99,6 +99,7 @@ for lib in $(echo $VERSION_DETAILS | jq -rc '.libraries[]'); do
     lib_name="$lib_base/$(echo $lib | jq -r '.downloads.artifact.path')"
     lib_path=$(dirname $lib_name)
     lib_url=$(echo $lib | jq -r '.downloads.artifact.url')
+    lib_sha1=$(echo $lib | jq -r '.downloads.artifact.sha1')
     if [[ ! $lib_name == "$lib_base/null" && ! -f $lib_name ]]; then
         allowed="allow"    # default if no rules are defined
         # check the rules for Linux
@@ -119,6 +120,14 @@ for lib in $(echo $VERSION_DETAILS | jq -rc '.libraries[]'); do
         echo -n "Downloading $lib_name ..."
         mkdir -p $lib_path
         curl -sSL -o $lib_name $lib_url
+        if [[ ! -z $lib_sha1 ]]; then
+            if echo "$lib_sha1 $lib_name" | sha1sum --quiet -c -; then
+                :
+            else
+                echo "$lib_name checksum is wrong. Remove and re-run."
+                exit 1
+            fi
+        fi
         echo "done"
     fi
 
@@ -177,8 +186,14 @@ for objhash in $(cat $ASSET_INDEX_FILE | jq -rc '.objects[] | .hash'); do
 done
 echo "done"
 
-# build classpath. This will get even the OSX libs, but since they should not be downloaded we dont care
-CP=$(echo $VERSION_DETAILS | jq -r '.libraries[]|"libraries/"+.downloads.artifact.path' | tr '\n' ':')
+# Rebuild the class path, checking if files exist, as OSX libs are not downloaded
+CP=""
+for lib in $(echo $VERSION_DETAILS | jq -r '.libraries[]|"libraries/"+.downloads.artifact.path'); do
+    if [[ -f "versions/$MAINLINE_VERSION/$lib" ]]; then
+            CP="$CP$lib:"
+    fi
+done
+
 MAIN_JAR=$(echo $VERSION_DETAILS | jq -r '.mainClass')
 
 # Build minecraft args from arglist if minecraftArguments string is absent
@@ -188,7 +203,7 @@ if [[ $GAME_ARGS == "null" ]]; then
     GAME_ARGS=$(echo $VERSION_DETAILS | jq -r  '[.arguments.game[] | strings] | join(" ")')
 fi
 
-# in latest minecraft this should come from
+# Hardcoded. In the latest minecraft this should come from
 # jq -r  '[.arguments.jvm[] | strings] | join(" ") ' versions/1.13/1.13.json
 # and from jvm option matching arch x86 (i.e. -Xss1M)
 # and from .logging.client.argument

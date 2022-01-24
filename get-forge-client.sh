@@ -52,6 +52,7 @@ fi
 
 normForgeVersion=$MAINLINE_VERSION-$FORGE_VERSION-$norm
 shortForgeVersion=$MAINLINE_VERSION-$FORGE_VERSION
+numForgeVersion=${FORGE_VERSION//./} # a decimal number for comparisons
 
 FORGE_UNIVERSAL="forge-$shortForgeVersion-universal.jar"
 
@@ -111,19 +112,30 @@ if [[ ${FORGE_VERSION%%.*} -ge 27 ]]; then
     # run the installer from a stub allowing the CLI use
     pushd $VERSION_DIR > /dev/null
     echo "{}" > launcher_profiles.json
+    echo "{}" > launcher_profiles_microsoft_store.json # needed since v36
+    #if [[ ${FORGE_VERSION%%.*} -lt 36 ]]; then
+    #    installerver=14
+    #else
+        installerver=36
+    #fi
     echo "Compiling the client installer..."
-    javac -cp $FORGE_INSTALLER ../../ClientInstaller.java -d .
+    javac -cp $FORGE_INSTALLER ../../ClientInstaller$installerver.java -d .
     echo "Running the installer..."
-    if ! java -cp $FORGE_INSTALLER:. ClientInstaller > forge-installer.log ; then
+    if ! java -cp $FORGE_INSTALLER:. ClientInstaller$installerver > forge-installer.log ; then
         echo "Forge client installation failed. Check forge-installer.log"
         exit 1
     fi
     # cleanup
-    rm ClientInstaller.class
+    rm ClientInstaller$installerver.class
     rm launcher_profiles.json
-    rm -rf versions # remove to avoid confusion. keep installer libraries around though in case we need to reinstall
+    rm launcher_profiles_microsoft_store.json
+    rm -rf versions # remove to avoid confusion. but keep the installer libraries around in case we need to reinstall
     popd > /dev/null
-    FORGE_CP="libraries/net/minecraftforge/forge/$shortForgeVersion/forge-$shortForgeVersion.jar:"
+    if [[ ${FORGE_VERSION%%.*} -lt 39 ]]; then
+        FORGE_CP="libraries/net/minecraftforge/forge/$shortForgeVersion/forge-$shortForgeVersion.jar:"
+    else
+        FORGE_CP="" # switched to modules
+    fi
 else
     VERSION_DETAILS=$(unzip -qc $VERSION_DIR/$FORGE_UNIVERSAL version.json)
     FORGE_CP="$FORGE_UNIVERSAL:"
@@ -216,8 +228,15 @@ if [[ $GAME_ARGS == "null" ]]; then
     GAME_ARGS="$MAINLINE_GAME_ARGS $(echo $VERSION_DETAILS | jq -r '[.arguments.game[] | strings] | join(" ")')"
 fi
 
+if [[ $(echo $VERSION_DETAILS | jq -r '.arguments.jvm') != "null" ]]; then
+    FORGE_JVM_OPTS=$(echo $VERSION_DETAILS | jq -r  '[.arguments.jvm[] | strings] | join(" ")') # present on Forge 39+
+else
+    FORGE_JVM_OPTS=""
+fi
+
+JVM_OPTS=$FORGE_JVM_OPTS' -Xss1M -Djava.library.path=${natives_directory} -Dminecraft.launcher.brand=${launcher_name} -Dminecraft.launcher.version=${launcher_version} -Dlog4j.configurationFile=${log_path} -cp ${classpath}'
+
 #LOG_FILE=$(echo $VERSION_DETAILS | jq -r '.logging.client.file.id')
-JVM_OPTS='-Xss1M -Djava.library.path=${natives_directory} -Dminecraft.launcher.brand=${launcher_name} -Dminecraft.launcher.version=${launcher_version} -Dlog4j.configurationFile=${log_path} -cp ${classpath}'
 
 CONFIG_FILE="$VERSION_DIR/$MAINLINE_VERSION-forge.config"
 
@@ -229,6 +248,8 @@ VER="$shortForgeVersion aka $FORGE_VERSION"
 assets_root="../../assets" # assets are shared across all versions
 auth_uuid=0
 auth_access_token=0
+clientid=0
+auth_xuid=0
 version_type=relase
 user_type=legacy
 launcher_name="minecraft-launcher"
@@ -240,6 +261,10 @@ assets_index_name="$ASSET_INDEX"
 natives_directory="../$MAINLINE_VERSION/$MAINLINE_VERSION-natives"
 log_path="$LOG_CONFIG"
 classpath="${FORGE_CP}${CP}"
+# Forge 39+ specific variables used in FORGE_JVM_OPTS
+classpath_separator=:
+library_directory=libraries
+version_name=$MAINLINE_VERSION
 # config lines
 JAVA="$JAVA"
 JVM_OPTS="$JVM_OPTS"
