@@ -8,7 +8,7 @@ if [[ $# -eq 0 ]]; then
     exit 0
 fi
 
-MAINLINE_VERSIONS_JSON=https://launchermeta.mojang.com/mc/game/version_manifest.json
+MAINLINE_VERSIONS_JSON="https://launchermeta.mojang.com/mc/game/version_manifest.json"
 
 # could also do latest.snapshot
 if [[ $1 == "latest" ]]; then
@@ -172,7 +172,7 @@ for lib in $(echo $VERSION_DETAILS | jq -rc '.libraries[]'); do
 done
 
 # get asset objects
-OBJ_SERVER="http://resources.download.minecraft.net"
+OBJ_SERVER="https://resources.download.minecraft.net"
 OBJ_FOLDER="assets/objects"
 echo -n "Downloading objects ..."
 for objhash in $(cat $ASSET_INDEX_FILE | jq -rc '.objects[] | .hash'); do
