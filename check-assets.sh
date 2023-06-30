@@ -1,6 +1,8 @@
 #!/bin/bash
 
-# Get
+# Verify that the assets have correct checksum
+# The installer curreently does this on the new version download
+#
 set -euo pipefail
 
 if [[ $# -eq 0 ]]; then
