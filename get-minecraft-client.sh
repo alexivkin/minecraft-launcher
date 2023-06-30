@@ -75,6 +75,12 @@ if [[ ! $ASSET_INDEX == "null" ]]; then
         echo -n "Downloading $ASSET_INDEX_FILE ..."
         mkdir -p assets/indexes
         curl -sSL -o $ASSET_INDEX_FILE $(echo $VERSION_DETAILS | jq -r '.assetIndex.url')
+        ASSET_INDEX_SHA1=$(echo $VERSION_DETAILS | jq -r '.assetIndex.sha1')
+        ASSET_INDEX_SHA1CHECK=$(sha1sum $ASSET_INDEX_FILE | cut -d ' ' -f 1)
+        if [[ $ASSET_INDEX_SHA1 != $ASSET_INDEX_SHA1CHECK ]]; then
+            echo "$ASSET_INDEX_FILE checksum is wrong. Remove and re-run."
+            exit 1
+        fi
         echo "done"
     fi
 fi
@@ -182,6 +188,11 @@ for objhash in $(cat $ASSET_INDEX_FILE | jq -rc '.objects[] | .hash'); do
         echo -n "."
         mkdir -p "$OBJ_FOLDER/$id"
         curl -sSL -o $objfile $OBJ_SERVER/$id/$objhash
+        sha1check=$(sha1sum $objfile | cut -d ' ' -f 1)
+        if [[ $objhash != $sha1check ]]; then
+            echo "$objfile checksum is wrong. Remove and re-run."
+            exit 1
+        fi
     fi
 done
 echo "done"
