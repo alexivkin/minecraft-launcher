@@ -29,16 +29,12 @@ case $MAINLINE_VERSION in
       norm=${MAINLINE_VERSION}.0 ;;
 esac
 
-#FORGE_VERSION=$(curl -fsSL $FORGE_VERSIONS_JSON | jq -r ".promos[\"$MAINLINE_VERSION-recommended\"]")
-#if [[ $FORGE_VERSION == "null" ]]; then
-    FORGE_VERSION=$(curl -fsSL $FORGE_VERSIONS_JSON | jq -r ".promos[\"$MAINLINE_VERSION-latest\"]")
-    if [[ $FORGE_VERSION == "null" ]]; then
-        FORGE_SUPPORTED_VERSIONS=$(curl -fsSL $FORGE_VERSIONS_JSON | jq -r '.promos| keys[] | rtrimstr("-latest") | rtrimstr("-recommended")' | sort -u)
-        echo "ERROR: Version $MAINLINE_VERSION is not supported by Forge. Supported versions are $FORGE_SUPPORTED_VERSIONS"
-        #curl -fsSL $FORGE_VERSIONS_JSON | jq -r '.promos | keys[]' | sed -r 's/(-latest|-recommended)//' | sort -u
-        exit 2
-    fi
-#fi
+FORGE_VERSION=$(curl -fsSL $FORGE_VERSIONS_JSON | jq -r ".promos[\"$MAINLINE_VERSION-latest\"]")
+if [[ $FORGE_VERSION == "null" ]]; then
+    FORGE_SUPPORTED_VERSIONS=$(curl -fsSL $FORGE_VERSIONS_JSON | jq -r '.promos| keys[] | rtrimstr("-latest") | rtrimstr("-recommended")' | sort -u --version-sort)
+    echo -e "ERROR: Version $MAINLINE_VERSION is not supported by Forge. Supported versions are:\n$FORGE_SUPPORTED_VERSIONS"
+    exit 2
+fi
 
 # get mainline if we don't already have it
 if [[ ! -f versions/$MAINLINE_VERSION/$MAINLINE_VERSION.config ]]; then
@@ -261,7 +257,10 @@ assets_index_name="$ASSET_INDEX"
 natives_directory="../$MAINLINE_VERSION/$MAINLINE_VERSION-natives"
 log_path="$LOG_CONFIG"
 classpath="${FORGE_CP}${CP}"
-# Forge 39+ specific variables used in FORGE_JVM_OPTS
+# Forge specific variables used in FORGE_JVM_OPTS
+# 10.13.4
+user_properties="{}"
+# 39.1.2+
 classpath_separator=:
 library_directory=libraries
 version_name=$MAINLINE_VERSION
