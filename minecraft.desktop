@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Minecraft
+GenericName=Minecraft
+Comment=Minecraft Launcher
+Exec=$HOME/minecraft/start <version> <player>
+Path=$HOME/minecraft
+Icon=minecraft-launcher
+Terminal=false
+Categories=Game;Application;
+StartupNotify=true

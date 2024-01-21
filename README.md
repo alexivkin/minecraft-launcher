@@ -16,14 +16,14 @@ Running: `./start <version> <player_nick>`
 
 * To run a Forge version add a suffix "-forge" to the version, for example `./start 1.17.10-forge player1`.
 * To see what normal and Forge versions are currently available for installation, run the script with a non-existing version, like this `./start 0 player1`, `./start 0-forge player1`
-* To create another game profile with the same game version and same player name, for example to try out different mods, specify a name of this profile as the last argument `./start <version> <player_nick> <profile>`
+* To create another game profile with the same game version and same player name, for example to try out different mods, specify a name of the new profile as the last argument `./start <version> <player_nick> <profile>`
 
 ## Troubleshooting
 
-1. Delete the version subfolder under "versons" and re-run `./start` to download and rebuild everything. The versions and player profiles are kept in separate folders, so you can remove versions without removing player configuration.
-2. If the step above did not work for a Forge version, remove both the Forge and the the corresponding mainline version folders under "versions" and run `./start` again to re-download everything.
+1. Force re-download by deleting the relevant minecraft version subfolder under `versons` and re-run `./start` to download and rebuild everything. The player profiles is kept in separate folders, under `profiles`, so you can remove versions without removing player configuration.
+2. If the step above did not work for a Forge version, remove both the Forge and the the corresponding mainline version folders under `versions` and run `./start` again to re-download everything.
 
-## How to add it to the KDE desktop
+## How to add it to the desktop
 
 Download and install the minecraft icon
 
@@ -32,22 +32,8 @@ curl -O https://launcher.mojang.com/download/minecraft-launcher.svg
 sudo install -Dm644 minecraft-launcher.svg /usr/share/icons/hicolor/symbolic/apps/minecraft-launcher.svg
 ```
 
-Then write the following into `~/.local/share/applications/minecraft.desktop`, with the correct path, version and the player
+Then edit `minecraft.desktop` to set the `<version>` and `<player>` you want, and copy it to `~/.local/share/applications/`.
 
-```
-[Desktop Entry]
-Type=Application
-Version=1.0
-Name=Minecraft
-GenericName=Minecraft
-Comment=Minecraft Launcher
-Exec=$HOME/minecraft/start <version> <player>
-Path=$HOME/minecraft
-Icon=minecraft-launcher
-Terminal=false
-Categories=Game;Application;
-StartupNotify=true
-```
 
 ## How to do reproduce manually what this launcher does
 
