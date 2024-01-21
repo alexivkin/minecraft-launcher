@@ -228,7 +228,7 @@ cat > $CONFIG_FILE << EOC
 VER="$MAINLINE_VERSION"
 # static variables
 assets_root="../../assets" # assets are shared across all versions
-auth_uuid=0
+auth_uuid=00000000-0000-0000-0000-000000000000
 auth_access_token=0
 clientid=0
 auth_xuid=0
