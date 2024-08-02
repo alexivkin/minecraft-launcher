@@ -34,26 +34,34 @@ java8=$(echo "$javas" | grep -m1 "\-8.*java$" || true)
 #java11=$(echo "$javas" | grep -m1 java-11 || true)
 java16=$(echo "$javas" | grep -m1 "\-16.*java$" || true)
 java17=$(echo "$javas" | grep -m1 "\-17.*java$" || true)
+java21=$(echo "$javas" | grep -m1 "\-21.*java$" || true)
 version_slug=$(echo $MAINLINE_VERSION | cut -d . -f 2)
 if [[ $version_slug -le 16 ]]; then
     if [[ -z $java8 ]]; then
-        echo "Need Java 8 to run" #$MAINLINE_VERSION
+        echo "Need Java 8 to run this version of minecraft" #$MAINLINE_VERSION
         exit 1
     fi
     JAVA=$java8
 elif [[ $version_slug -le 17 ]]; then
     if [[ -z $java16 ]]; then
-        echo "Java 16 is required for mainline versions 1.17+. Only found these java versions: $javas"
+        echo "Java 16 is required for mainline versions 1.16+. Only found these java versions: $javas"
         exit 1
     else
         JAVA=$java16
     fi
-else
+elif [[ $version_slug -lt 21 ]]; then
     if [[ -z $java17 ]]; then
-        echo "Java 17 is required for mainline versions 1.18+. Only found these java versions: $javas"
+        echo "Java 17 is required for mainline versions 1.17-1.20, e.g. openjdk-17-jre. Only found these java versions: $javas"
         exit 1
     else
         JAVA=$java17
+    fi
+else
+    if [[ -z $java21 ]]; then
+        echo "Java 21 is required for mainline versions 1.21+, e.g. openjdk-21-jre. Only found these java versions: $javas. "
+        exit 1
+    else
+        JAVA=$java21
     fi
 fi
 
