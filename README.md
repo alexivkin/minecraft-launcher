@@ -10,7 +10,7 @@ Pairs well with the [minecraft server launcher for Linux](https://github.com/ale
 
 ## Running
 
-Prerequisites: make sure you have the following tools installed: `jq`,`unzip`,`curl`, `sha1sum`
+Prerequisites: make sure you have Java and the following tools installed: `jq`,`unzip`,`curl`, `sha1sum`
 
 Running: `./start <version> <player_nick>`
 

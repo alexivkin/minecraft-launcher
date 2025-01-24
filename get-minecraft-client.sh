@@ -8,6 +8,11 @@ if [[ $# -eq 0 ]]; then
     exit 0
 fi
 
+if ! which curl &> /dev/null; then
+    echo "Install curl by running: sudo apt install curl"
+    exit 1
+fi
+
 MAINLINE_VERSIONS_JSON="https://launchermeta.mojang.com/mc/game/version_manifest.json"
 
 # could also do latest.snapshot
@@ -38,27 +43,27 @@ java21=$(echo "$javas" | grep -m1 "\-21.*java$" || true)
 version_slug=$(echo $MAINLINE_VERSION | cut -d . -f 2)
 if [[ $version_slug -le 16 ]]; then
     if [[ -z $java8 ]]; then
-        echo "Need Java 8 to run this version of minecraft" #$MAINLINE_VERSION
+        echo "Java 8 is required to run older versions of minecraft. JDK is recommended to support Forge. Run: sudo apt install openjdk-8-jdk\n. Only found the following java versions: $javas"
         exit 1
     fi
     JAVA=$java8
 elif [[ $version_slug -le 17 ]]; then
     if [[ -z $java16 ]]; then
-        echo "Java 16 is required for mainline versions 1.16+. Only found these java versions: $javas"
+        echo "Java 16 or newer is required for mainline versions 1.16+. 1.17 JDK is recommended to support Forge. Run: sudo apt install openjdk-17-jdk\n. Only found the following java versions: $javas"
         exit 1
     else
         JAVA=$java16
     fi
 elif [[ $version_slug -lt 21 ]]; then
     if [[ -z $java17 ]]; then
-        echo "Java 17 is required for mainline versions 1.17-1.20, e.g. openjdk-17-jre. Only found these java versions: $javas"
+        echo "Java 17 is required for mainline versions 1.17-1.20. JDK is recommended to support Forge. Run: sudo apt install openjdk-17-jdk\n. Only found the following java versions: $javas"
         exit 1
     else
         JAVA=$java17
     fi
 else
     if [[ -z $java21 ]]; then
-        echo "Java 21 is required for mainline versions 1.21+, e.g. openjdk-21-jre. Only found these java versions: $javas. "
+        echo "Java 21 is required for mainline versions 1.21+, JDK is recommended to support Forge. Run: sudo apt install openjdk-21-jdk\n. Only found the following java versions: $javas. "
         exit 1
     else
         JAVA=$java21
