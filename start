@@ -4,6 +4,7 @@ set -euo pipefail
 
 if [[ $# -lt 2 ]]; then
     echo 'Specify the minecraft version, the nick and the profile, eg. "1.13.2 nick [profile]" or "1.12.2-forge nick [profile]"'
+    echo "If you are not sure which version to use, run ./list-versions.sh for the list of available versions"
     echo 'The third optional argument specifies a folder for storing that version. This allows two forge installs of the same version, but different mods'
     exit 0
 fi

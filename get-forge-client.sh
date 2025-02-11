@@ -1,15 +1,13 @@
 #!/bin/bash
 
 # get the latest version and build the latest
-
+#set -x
 set -euo pipefail
 
 if [[ $# -eq 0 ]]; then
     echo Specify the Minecraft Server Version or "latest" for the latest version of the minecraft server to get the compatible forge for
     exit 0
 fi
-
-echo "Downloading Forge version $1..."
 
 MAINLINE_VERSIONS_JSON=https://launchermeta.mojang.com/mc/game/version_manifest.json
 FORGE_VERSIONS_JSON=http://files.minecraftforge.net/maven/net/minecraftforge/forge/promotions_slim.json
@@ -29,12 +27,28 @@ case $MAINLINE_VERSION in
       norm=${MAINLINE_VERSION}.0 ;;
 esac
 
+version_slug=$(echo $MAINLINE_VERSION | cut -d . -f 2)
+
+if [[ ! -x $(command -v javac) ]]; then
+    echo "Installing forge requires a java compiler."
+    if [[ $version_slug -le 16 ]]; then
+        echo "Java 8 is required to run older versions of minecraft. Run: sudo apt install openjdk-8-jdk"
+    elif [[ $version_slug -le 17 ]]; then
+        echo "1.17 JDK is recommended. Run: sudo apt install openjdk-17-jdk"
+    else
+        echo "1.21+ JDK is recommended.. Run: sudo apt install openjdk-21-jdk"
+    fi
+    exit 3
+fi
+
 FORGE_VERSION=$(curl -fsSL $FORGE_VERSIONS_JSON | jq -r ".promos[\"$MAINLINE_VERSION-latest\"]")
 if [[ $FORGE_VERSION == "null" ]]; then
-    FORGE_SUPPORTED_VERSIONS=$(curl -fsSL $FORGE_VERSIONS_JSON | jq -r '.promos| keys[] | rtrimstr("-latest") | rtrimstr("-recommended")' | sort -u --version-sort)
-    echo -e "ERROR: Version $MAINLINE_VERSION is not supported by Forge. Supported versions are:\n$FORGE_SUPPORTED_VERSIONS"
+    FORGE_SUPPORTED_VERSIONS=$(curl -fsSL $FORGE_VERSIONS_JSON | jq -r '.promos| keys[] | rtrimstr("-latest") | rtrimstr("-recommended")' | sort -u --version-sort | sed -z 's/\n/-forge, /g')
+    echo -e "ERROR: Version $MAINLINE_VERSION-forge is not supported by Forge. Supported versions are:\n$FORGE_SUPPORTED_VERSIONS"
     exit 2
 fi
+
+echo "Downloading Forge version $1..."
 
 # get mainline if we don't already have it
 if [[ ! -f versions/$MAINLINE_VERSION/$MAINLINE_VERSION.config ]]; then
@@ -96,7 +110,7 @@ fi
 #fi
 
 lib_base="$VERSION_DIR/libraries"
-echo "Getting the libs for $shortForgeVersion ..."
+echo "Downloading the libraries for Forge $shortForgeVersion ..."
 
 #rooturl="http://files.minecraftforge.net/maven" # from http://files.minecraftforge.net/mirror-brand.list
 
@@ -109,16 +123,18 @@ if [[ ${FORGE_VERSION%%.*} -ge 27 ]]; then
     pushd $VERSION_DIR > /dev/null
     echo "{}" > launcher_profiles.json
     echo "{}" > launcher_profiles_microsoft_store.json # needed since v36
-    #if [[ ${FORGE_VERSION%%.*} -lt 36 ]]; then
-    #    installerver=14
-    #else
+    if [[ ${FORGE_VERSION%%.*} -lt 36 ]]; then
+        installerver=14
+    elif [[ ${FORGE_VERSION%%.*} -lt 46 ]]; then
         installerver=36
-    #fi
+    else
+        installerver=46
+    fi
     echo "Compiling the client installer..."
     javac -cp $FORGE_INSTALLER ../../ClientInstaller$installerver.java -d .
     echo "Running the installer..."
     if ! java -cp $FORGE_INSTALLER:. ClientInstaller$installerver > forge-installer.log ; then
-        echo "Forge client installation failed. Check forge-installer.log"
+        echo "Forge client installation failed. Check $VERSION_DIR/forge-installer.log"
         exit 1
     fi
     # cleanup
@@ -148,12 +164,12 @@ for name in $(echo $VERSION_DETAILS | jq -r '.libraries[] | select(.clientreq or
     class=${s[0]}
     lib=${s[1]}
     ver=${s[2]}
-    # ignore the forge jar entry as we are keeping it in a different folder, and already added to FORGE_CP
-    if [[ $class == "net.minecraftforge" && $lib == "forge" ]]; then
+    # for older forge version ignore the forge jar entry as we are keeping it in a different folder, and already added to FORGE_CP
+    if [[ ${FORGE_VERSION%%.*} -lt 39 && $class == "net.minecraftforge" && $lib == "forge" ]]; then
         continue
     fi
     # get destination path
-    full_path=$(echo $VERSION_DETAILS | jq -r '.libraries[] | select(.name=="'$name'") | .downloads.artifact.path')
+    full_path=$(echo $VERSION_DETAILS | jq -r '.libraries[] | select(.name=="'$name'")' | jq -r --slurp 'first | .downloads.artifact.path') # slurp to get the first match
     if [[ $full_path != "null" ]]; then
         file=$(basename $full_path)
         path=$(dirname $full_path)
@@ -162,9 +178,9 @@ for name in $(echo $VERSION_DETAILS | jq -r '.libraries[] | select(.clientreq or
         path="${class//./\/}/$lib/$ver"
     fi
     # get source url
-    url=$(echo $VERSION_DETAILS | jq -r '.libraries[] | select(.name=="'$name'") | .downloads.artifact.url')
+    url=$(echo $VERSION_DETAILS | jq -r '.libraries[] | select(.name=="'$name'")' | jq -r --slurp 'first | .downloads.artifact.url')
     if [[ $url == "null" ]]; then
-        baseurl=$(echo $VERSION_DETAILS | jq -r '.libraries[] | select(.name=="'$name'") | .url')
+        baseurl=$(echo $VERSION_DETAILS | jq -r '.libraries[] | select(.name=="'$name'")' | jq -r --slurp 'first | .url')
         if [[ $baseurl == "null" ]]; then
             baseurl="https://libraries.minecraft.net/"
         fi
@@ -179,7 +195,7 @@ for name in $(echo $VERSION_DETAILS | jq -r '.libraries[] | select(.clientreq or
             # get and unpack augmented pack200 file
             echo "...trying $url.pack.xz"
             if ! curl -fsSL -o $dest.pack.xz "$url.pack.xz"; then
-                echo "cant download"
+                echo "can't download"
                 exit 1
             fi
             xz -d $dest.pack.xz
@@ -195,7 +211,9 @@ for name in $(echo $VERSION_DETAILS | jq -r '.libraries[] | select(.clientreq or
     fi
     #FORGE_CP="${FORGE_CP}$dest:"
     # use relative library path
-    FORGE_CP="${FORGE_CP}libraries/$path/$file:"
+    if ! echo "$FORGE_CP" | grep -q "libraries/$path/$file:" ; then # only add if it's not already in the path to avoid duplicates
+    	FORGE_CP="${FORGE_CP}libraries/$path/$file:"
+    fi
 done
 
 MAINLINE_CLIENT_JAR="versions/$MAINLINE_VERSION/$MAINLINE_VERSION.jar"

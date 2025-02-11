@@ -8,8 +8,13 @@ if [[ $# -eq 0 ]]; then
     exit 0
 fi
 
-if ! which curl &> /dev/null; then
-    echo "Install curl by running: sudo apt install curl"
+if ! command -v curl &> /dev/null; then
+    echo "Install curl by running 'sudo apt install curl'"
+    exit 1
+fi
+
+if ! command -v jq &> /dev/null; then
+    echo "Install jq by running 'sudo apt install jq'"
     exit 1
 fi
 
@@ -28,12 +33,12 @@ MAINLINE_CLIENT_JAR="versions/$MAINLINE_VERSION/$MAINLINE_VERSION.jar"
 
 VERSION_JSON=$(curl -s $MAINLINE_VERSIONS_JSON | jq --arg VERSION "$MAINLINE_VERSION" -r '[.versions[]|select(.id == $VERSION)][0].url')
 if [[ $VERSION_JSON == "null" ]]; then
-    echo "No mainline version $MAINLINE_VERSION exists. Available versions are"
-    curl -s $MAINLINE_VERSIONS_JSON | jq -r '.versions[]|select(.type == "release").id'
+    MAINLINE_VERSIONS=$(curl -s $MAINLINE_VERSIONS_JSON | jq -r '.versions[]|select(.type == "release").id' | sort -u --version-sort | sed -z 's/\n/, /g')
+    echo "No mainline version $MAINLINE_VERSION exists. Available versions are: $MAINLINE_VERSIONS"
     exit 1
 fi
 
-# find the proper java - 8 before 1.13, 11 after
+# find the proper java version
 javas=$(update-alternatives --list java)
 java8=$(echo "$javas" | grep -m1 "\-8.*java$" || true)
 #java11=$(echo "$javas" | grep -m1 java-11 || true)
@@ -43,27 +48,27 @@ java21=$(echo "$javas" | grep -m1 "\-21.*java$" || true)
 version_slug=$(echo $MAINLINE_VERSION | cut -d . -f 2)
 if [[ $version_slug -le 16 ]]; then
     if [[ -z $java8 ]]; then
-        echo "Java 8 is required to run older versions of minecraft. JDK is recommended to support Forge. Run: sudo apt install openjdk-8-jdk\n. Only found the following java versions: $javas"
+        echo -e "Java 8 is required to run older versions of minecraft. JDK is recommended to support Forge. Run: sudo apt install openjdk-8-jdk\nOnly found the following java versions: $javas"
         exit 1
     fi
     JAVA=$java8
 elif [[ $version_slug -le 17 ]]; then
     if [[ -z $java16 ]]; then
-        echo "Java 16 or newer is required for mainline versions 1.16+. 1.17 JDK is recommended to support Forge. Run: sudo apt install openjdk-17-jdk\n. Only found the following java versions: $javas"
+        echo -e "Java 16 or newer is required for mainline versions 1.16+. 1.17 JDK is recommended to support Forge. Run: sudo apt install openjdk-17-jdk\nOnly found the following java versions: $javas"
         exit 1
     else
         JAVA=$java16
     fi
 elif [[ $version_slug -lt 21 ]]; then
     if [[ -z $java17 ]]; then
-        echo "Java 17 is required for mainline versions 1.17-1.20. JDK is recommended to support Forge. Run: sudo apt install openjdk-17-jdk\n. Only found the following java versions: $javas"
+        echo -e "Java 17 is required for mainline versions 1.17-1.20. JDK is recommended to support Forge. Run: sudo apt install openjdk-17-jdk\nOnly found the following java versions: $javas"
         exit 1
     else
         JAVA=$java17
     fi
 else
     if [[ -z $java21 ]]; then
-        echo "Java 21 is required for mainline versions 1.21+, JDK is recommended to support Forge. Run: sudo apt install openjdk-21-jdk\n. Only found the following java versions: $javas. "
+        echo -e "Java 21 is required for mainline versions 1.21+, JDK is recommended to support Forge. Run: sudo apt install openjdk-21-jdk\nOnly found the following java versions: $javas. "
         exit 1
     else
         JAVA=$java21
@@ -112,6 +117,8 @@ fi
 
 lib_base="versions/$MAINLINE_VERSION/libraries"
 
+LIB_NUM=$(echo $VERSION_DETAILS | jq -rc '.libraries[]' | wc -l)
+completed_libs=0
 # get all the necessary libs for this client
 for lib in $(echo $VERSION_DETAILS | jq -rc '.libraries[]'); do
     #echo $lib
@@ -119,6 +126,7 @@ for lib in $(echo $VERSION_DETAILS | jq -rc '.libraries[]'); do
     lib_path=$(dirname $lib_name)
     lib_url=$(echo $lib | jq -r '.downloads.artifact.url')
     lib_sha1=$(echo $lib | jq -r '.downloads.artifact.sha1')
+    completed_libs=$((completed_libs + 1))
     if [[ ! $lib_name == "$lib_base/null" && ! -f $lib_name ]]; then
         allowed="allow"    # default if no rules are defined
         # check the rules for Linux
@@ -136,7 +144,7 @@ for lib in $(echo $VERSION_DETAILS | jq -rc '.libraries[]'); do
                 continue
             fi
         fi
-        echo -n "Downloading $lib_name ..."
+    	printf "Downloading $LIB_NUM libraries: %d%%\r" "$(( (completed_libs * 100) / LIB_NUM ))"
         mkdir -p $lib_path
         curl -sSL -o $lib_name $lib_url
         if [[ ! -z $lib_sha1 ]]; then
@@ -147,9 +155,8 @@ for lib in $(echo $VERSION_DETAILS | jq -rc '.libraries[]'); do
                 exit 1
             fi
         fi
-        echo "done"
+        #echo "done"
     fi
-
     # get the native libs and unpack
     native_linux=$(echo $lib | jq -rc '.natives.linux')
     native_linux_name="$lib_base/$(echo $lib | jq -rc '.downloads.classifiers["'$native_linux'"].path')"
@@ -187,18 +194,21 @@ for lib in $(echo $VERSION_DETAILS | jq -rc '.libraries[]'); do
         unzip -qn $native_linux_name -d $native_so_path # -n to never overwrite, -o to always
         #echo "done"
     fi
-
 done
+echo "Downloading $LIB_NUM libraries: 100%%"
 
 # get asset objects
 OBJ_SERVER="https://resources.download.minecraft.net"
 OBJ_FOLDER="assets/objects"
-echo -n "Downloading objects ..."
+OBJ_NUM=$(cat $ASSET_INDEX_FILE | jq -rc '.objects[] | .hash' | wc -l)
+completed_objs=0
 for objhash in $(cat $ASSET_INDEX_FILE | jq -rc '.objects[] | .hash'); do
     id=${objhash:0:2}
+    completed_objs=$((completed_objs + 1))
+    printf "Checking and downloading $OBJ_NUM objects: %d%%\r" "$(( (completed_objs * 100) / OBJ_NUM ))"
     objfile=$OBJ_FOLDER/$id/$objhash
     if [[ ! -f $objfile ]]; then
-        echo -n "."
+        #echo -n "."
         mkdir -p "$OBJ_FOLDER/$id"
         curl -sSL -o $objfile $OBJ_SERVER/$id/$objhash
         sha1check=$(sha1sum $objfile | cut -d ' ' -f 1)
@@ -208,7 +218,7 @@ for objhash in $(cat $ASSET_INDEX_FILE | jq -rc '.objects[] | .hash'); do
         fi
     fi
 done
-echo "done"
+echo "Checking and downloading $OBJ_NUM objects: 100%"
 
 # Rebuild the class path, checking if files exist, as OSX libs are not downloaded
 CP=""
@@ -249,6 +259,8 @@ version_type=release
 user_type=legacy
 launcher_name="minecraft-launcher"
 launcher_version="2.1.1349"
+# certain mainline versions included user_properties as well
+user_properties="{}"
 # dynamic variables
 # paths are relative to versions/$MAINLINE_VERSION
 MAIN="$MAIN_JAR"

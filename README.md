@@ -8,6 +8,8 @@ Pairs well with the [minecraft server launcher for Linux](https://github.com/ale
 * Works with offline game profiles.
 * Allows multiple versions, player profiles, and game mod configurations to be installed and run at the same time.
 
+Please consider supporting the Forge project through https://www.patreon.com/LexManos/ 
+
 ## Running
 
 Prerequisites: make sure you have Java and the following tools installed: `jq`,`unzip`,`curl`, `sha1sum`
@@ -33,7 +35,6 @@ sudo install -Dm644 minecraft-launcher.svg /usr/share/icons/hicolor/symbolic/app
 ```
 
 Then edit `minecraft.desktop` to set the `<version>` and `<player>` you want, and copy it to `~/.local/share/applications/`.
-
 
 ## How to do reproduce manually what this launcher does
 
