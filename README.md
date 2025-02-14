@@ -3,10 +3,9 @@
 A smarter way of managing multiple minecraft installations on Linux. It supports multiple versions, users and profiles in parallel, including normal (aka vanilla/mainline) Minecraft, **Forge** and **NeoForge**.
 Pairs well with the [minecraft server launcher for Linux](https://github.com/alexivkin/minecraft-server-container).
 
-* Minecraft versions are downloaded automatically if they are not already installed.
-* Works with offline game profiles.
+* Fully automated, command line installation of all versions of Minecraft, Forge and NeoForge.
 * Allows multiple versions, player profiles, and game mod configurations to be installed and run at the same time.
-* Runs from command line, not graphical interface is required to start.
+* Supports offline game profiles.
 
 Please consider supporting the Forge project and NeoForge projects directly.
 
