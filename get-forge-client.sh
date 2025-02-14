@@ -44,16 +44,16 @@ fi
 FORGE_VERSION=$(curl -fsSL $FORGE_VERSIONS_JSON | jq -r ".promos[\"$MAINLINE_VERSION-latest\"]")
 if [[ $FORGE_VERSION == "null" ]]; then
     FORGE_SUPPORTED_VERSIONS=$(curl -fsSL $FORGE_VERSIONS_JSON | jq -r '.promos| keys[] | rtrimstr("-latest") | rtrimstr("-recommended")' | sort -u --version-sort | sed -z 's/\n/-forge, /g')
-    echo -e "ERROR: Version $MAINLINE_VERSION-forge is not supported by Forge. Supported versions are:\n$FORGE_SUPPORTED_VERSIONS"
+    echo -e "ERROR: Version $MAINLINE_VERSION is not supported by Forge. Supported versions are:\n$FORGE_SUPPORTED_VERSIONS"
     exit 2
 fi
-
-echo "Downloading Forge version $1..."
 
 # get mainline if we don't already have it
 if [[ ! -f versions/$MAINLINE_VERSION/$MAINLINE_VERSION.config ]]; then
     ./get-minecraft-client.sh $MAINLINE_VERSION
 fi
+
+echo "Downloading Forge version $1..."
 
 # temp bugfix workaround
 #if [[ $FORGE_VERSION == "27.0.24" ]]; then
@@ -110,8 +110,6 @@ fi
 #fi
 
 lib_base="$VERSION_DIR/libraries"
-echo "Downloading the libraries for Forge $shortForgeVersion ..."
-
 #rooturl="http://files.minecraftforge.net/maven" # from http://files.minecraftforge.net/mirror-brand.list
 
 # version file moved into the installer after 1.12
@@ -155,8 +153,7 @@ fi
 
 echo "$VERSION_DETAILS" > $VERSION_DIR/$MAINLINE_VERSION-forge-$FORGE_VERSION.json
 
-# get all the necessary libs for this forge server, starting with the forge itself
-#FORGE_CP="$VERSION_DIR/$FORGE_UNIVERSAL:"
+echo "Downloading the libraries for Forge $shortForgeVersion ..."
 
 for name in $(echo $VERSION_DETAILS | jq -r '.libraries[] | select(.clientreq or .clientreq == null) | .name'); do
     # split the name up

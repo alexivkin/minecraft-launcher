@@ -23,6 +23,8 @@ game_directory="../../$game_profile"
 if [[ ! -f versions/$version_name/$version_name.config ]]; then
     if [[ $version_name == *-forge ]]; then
         ./get-forge-client.sh ${version_name%%-forge}
+    elif [[ $version_name == *-neoforge ]]; then
+        ./get-neoforge-client.sh ${version_name%%-neoforge}
     else
         ./get-minecraft-client.sh $version_name
     fi
