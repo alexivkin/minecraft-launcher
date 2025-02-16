@@ -5,7 +5,7 @@
 set -euo pipefail
 
 if [[ $# -eq 0 ]]; then
-    echo Specify the Minecraft Server Version or "latest" for the latest version of the minecraft server to get the compatible forge for
+    echo "Specify the Minecraft Server Version or "latest" for the latest version of the minecraft server to get the compatible Forge"
     exit 0
 fi
 
@@ -53,7 +53,7 @@ if [[ ! -f versions/$MAINLINE_VERSION/$MAINLINE_VERSION.config ]]; then
     ./get-minecraft-client.sh $MAINLINE_VERSION
 fi
 
-echo "Downloading Forge version $1..."
+echo "Downloading Forge $FORGE_VERSION for Minecraft $MAINLINE_VERSION..."
 
 # temp bugfix workaround
 #if [[ $FORGE_VERSION == "27.0.24" ]]; then
@@ -128,7 +128,7 @@ if [[ ${FORGE_VERSION%%.*} -ge 27 ]]; then
     else
         installerver=46
     fi
-    echo "Compiling the client installer..."
+    echo "Compiling the installer..."
     javac -cp $FORGE_INSTALLER ../../ClientInstaller$installerver.java -d .
     echo "Running the installer..."
     if ! java -cp $FORGE_INSTALLER:. ClientInstaller$installerver > forge-installer.log ; then

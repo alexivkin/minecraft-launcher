@@ -5,7 +5,7 @@
 set -euo pipefail
 
 if [[ $# -eq 0 ]]; then
-    echo Specify the Minecraft Server Version or "latest" for the latest version of the minecraft server to get the compatible neoforge for
+    echo "Specify the Minecraft Server Version or "latest" for the latest version of the minecraft server to get the compatible NeoForge"
     exit 0
 fi
 
@@ -17,15 +17,6 @@ if [[ $1 == "latest" ]]; then
 else
     MAINLINE_VERSION=$1
 fi
-
-norm=$MAINLINE_VERSION
-
-case $MAINLINE_VERSION in
-    *.*.*)
-      norm=$MAINLINE_VERSION ;;
-    *.*)
-      norm=${MAINLINE_VERSION}.0 ;;
-esac
 
 version_slug=$(echo $MAINLINE_VERSION | cut -d . -f 2)
 
@@ -53,22 +44,18 @@ if [[ ! -f versions/$MAINLINE_VERSION/$MAINLINE_VERSION.config ]]; then
     ./get-minecraft-client.sh $MAINLINE_VERSION
 fi
 
-echo "Downloading NeoForge version $1..."
-
-#NeoForgeVersion=$MAINLINE_VERSION-$NEOFORGE_VERSION
-numNeoForgeVersion=${NEOFORGE_VERSION//./} # a decimal number for comparisons
-
 VERSION_DIR="versions/$MAINLINE_VERSION-neoforge"
 mkdir -p $VERSION_DIR
+
+echo "Downloading NeoForge $NEOFORGE_VERSION for Minecraft version $MAINLINE_VERSION..."
 
 # for versions 27 and onward (minecraft 1.14) download the installer
 NEOFORGE_INSTALLER="neoforge-$NEOFORGE_VERSION-installer.jar"
 if [[ ! -f $VERSION_DIR/$NEOFORGE_INSTALLER ]]; then
-    echo "Downloading $NEOFORGE_VERSION installer"
+    echo "Downloading the installer"
     downloadUrl=https://maven.neoforged.net/releases/net/neoforged/neoforge/$NEOFORGE_VERSION/$NEOFORGE_INSTALLER
-    #echo "$downloadUrl"
     if ! curl -o $VERSION_DIR/$NEOFORGE_INSTALLER -fsSL $downloadUrl; then
-        echo no url worked
+        echo "Can't download the installer from $downloadUrl"
         exit 3
     fi
 else
@@ -84,7 +71,7 @@ pushd $VERSION_DIR > /dev/null
 echo "{}" > launcher_profiles.json
 echo "{}" > launcher_profiles_microsoft_store.json # needed since v36
 installerver=36
-echo "Compiling the client installer..."
+echo "Compiling the installer..."
 javac -cp $NEOFORGE_INSTALLER ../../ClientInstaller$installerver.java -d .
 echo "Running the installer..."
 if ! java -cp $NEOFORGE_INSTALLER:. ClientInstaller$installerver > neoforge-installer.log ; then
@@ -97,13 +84,16 @@ rm launcher_profiles.json
 rm launcher_profiles_microsoft_store.json
 rm -rf versions # remove to avoid confusion. but keep the installer libraries around in case we need to reinstall
 popd > /dev/null
-NEOFORGE_CP=""
 
 echo "$VERSION_DETAILS" > $VERSION_DIR/$MAINLINE_VERSION-neoforge-$NEOFORGE_VERSION.json
 
-echo "Downloading the libraries for NeoForge $NEOFORGE_VERSION ..."
+NEOFORGE_CP=""
+NEOFORGE_LIBS=$(echo $VERSION_DETAILS | jq -r '.libraries[] | select(.clientreq or .clientreq == null) | .name')
+NEOFORGE_LIB_NUM=$(echo "$NEOFORGE_LIBS" | wc -l)
 
-for name in $(echo $VERSION_DETAILS | jq -r '.libraries[] | select(.clientreq or .clientreq == null) | .name'); do
+echo "Downloading $NEOFORGE_LIB_NUM NeoForge libraries..."
+
+for name in $NEOFORGE_LIBS; do
     # split the name up
     s=(${name//:/ })
     class=${s[0]}
@@ -150,7 +140,6 @@ for name in $(echo $VERSION_DETAILS | jq -r '.libraries[] | select(.clientreq or
             rm $dest.pack
         fi
     fi
-    #NEOFORGE_CP="${NEOFORGE_CP}$dest:"
     # use relative library path
     if ! echo "$NEOFORGE_CP" | grep -q "libraries/$path/$file:" ; then # only add if it's not already in the path to avoid duplicates
     	NEOFORGE_CP="${NEOFORGE_CP}libraries/$path/$file:"

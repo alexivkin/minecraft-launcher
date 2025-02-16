@@ -4,7 +4,7 @@
 set -euo pipefail
 
 if [[ $# -eq 0 ]]; then
-    echo Specify the Minecraft Version or "latest" for the latest version of minecraft
+    echo "Specify the Minecraft Version or "latest" for the latest version of minecraft"
     exit 0
 fi
 
@@ -195,7 +195,7 @@ for lib in $(echo $VERSION_DETAILS | jq -rc '.libraries[]'); do
         #echo "done"
     fi
 done
-echo "Downloading $LIB_NUM libraries: 100%%"
+echo "Downloading $LIB_NUM libraries: 100%"
 
 # get asset objects
 OBJ_SERVER="https://resources.download.minecraft.net"
