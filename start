@@ -3,9 +3,12 @@
 set -euo pipefail
 
 if [[ $# -lt 2 ]]; then
-    echo 'Specify the minecraft version, the nick and the profile, eg. "1.13.2 nick [profile]" or "1.12.2-forge nick [profile]"'
-    echo "If you are not sure which version to use, run ./list-versions.sh for the list of available versions"
-    echo 'The third optional argument specifies a folder for storing that version. This allows two forge installs of the same version, but different mods'
+    echo 'Run with $0 <version> <nick> and the profile, eg. "1.13.2 nick [profile] [game options]" or "1.12.2-forge nick [profile] [game options]"'
+    echo "         <version> is the name of the minecraft version. If it ends with -forge (e.g. 1.12.2-forge) or -neoforge, then the appropriate mods will be loaded"
+    echo "                   If you are not sure which version to use, run ./list-versions.sh for the list of available versions"
+    echo "         <nick>    is any name you like to be know in the game. For the offline version your nick can be anything"
+    echo "         [profile] is an optional argument specifies a folder for storing that version. This allows two [neo]forge installs of the same version, but using different mods"
+    echo "         [options] allows you to specify additional game options, for example --server and --port command line arguments or the equivalent --quickPlayMultiplayer"
     exit 0
 fi
 
@@ -15,7 +18,16 @@ cd "$DIR"
 # setting these specific variables so they can be used inside GAME_ARGS sourced from $version_name.config
 version_name=$1
 auth_player_name=$2
-game_profile="profiles/$auth_player_name-${3:-base}-$version_name"
+shift 2
+
+game_profile="profiles/$auth_player_name-base-$version_name"
+# check if there are more arguments. after shifting $# will count the remaining arguments
+if [[ $# -gt 0 ]]; then
+    if [[ ! $1 =~ ^-- ]]; then
+        game_profile="profiles/$auth_player_name-$1-$version_name"
+        shift
+    fi
+fi
 
 mkdir -p "$game_profile"
 game_directory="../../$game_profile"
@@ -40,4 +52,4 @@ cd versions/$version_name/
 # extra tunings to run better
 JVM_OPTS="$JVM_OPTS -Xmx2G -XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M"
 
-$JAVA $JVM_OPTS $MAIN $GAME_ARGS
+$JAVA $JVM_OPTS $MAIN $GAME_ARGS $@
