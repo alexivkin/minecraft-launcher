@@ -13,11 +13,12 @@ Please consider supporting the Forge project and NeoForge projects directly.
 
 Prerequisites: make sure you have Java and the following tools installed: `jq`,`unzip`,`curl`, `sha1sum`
 
-Running: `./start <version> <player_nick>`
+Running: `./start <version> <player_nick> [profile] [game arguments]`
 
 * To run a Forge version add a suffix "-forge" to the version, for example `./start 1.17.10-forge player1`. For NeoForge use `./start 1.17.10-neoforge player1`
-* If you are not sure what versions are available run `./list-versions.sh`
+* If you are not sure what versions are available, run `./list-versions.sh`
 * To create another game profile with the same game version and same player name, for example to try out different mods, specify a name of the new profile as the last argument `./start <version> <player_nick> <profile>`
+* To run the game with additional arguments, add them as the last arguments.
 
 ## Troubleshooting
 
