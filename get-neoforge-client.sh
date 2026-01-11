@@ -32,7 +32,7 @@ if [[ ! -x $(command -v javac) ]]; then
     exit 3
 fi
 
-NEOFORGE_VERSION=$(curl -fsSL $NEOFORGE_VERSIONS_JSON | jq -r '.versions[]' | { grep "${MAINLINE_VERSION:2}" || true; } | sort --version-sort | tail -1)
+NEOFORGE_VERSION=$(curl -fsSL $NEOFORGE_VERSIONS_JSON | jq -r '.versions[]' | { grep "${MAINLINE_VERSION:2}\." || true; } | sort --version-sort | tail -1)
 if [[ -z $NEOFORGE_VERSION ]]; then
     NEOFORGE_SUPPORTED_VERSIONS=$(curl -fsSL $NEOFORGE_VERSIONS_JSON | jq -r '.versions[]' | sed -r 's/([0-9]+\.[0-9]+).*/\1/;s/^/1./' | sort -Vu | sed -z 's/\n/, /g')
     echo -e "ERROR: Version $MAINLINE_VERSION is not supported by NeoForge. Supported versions are:\n$NEOFORGE_SUPPORTED_VERSIONS"
@@ -91,6 +91,13 @@ NEOFORGE_CP=""
 NEOFORGE_LIBS=$(echo $VERSION_DETAILS | jq -r '.libraries[] | select(.clientreq or .clientreq == null) | .name')
 NEOFORGE_LIB_NUM=$(echo "$NEOFORGE_LIBS" | wc -l)
 
+# Grab JVM_OPTS now to check for duplicates of jvm -p option and -cp (classpath) that's built later
+if [[ $(echo $VERSION_DETAILS | jq -r '.arguments.jvm') != "null" ]]; then
+    NEOFORGE_JVM_OPTS=$(echo $VERSION_DETAILS | jq -r  '[.arguments.jvm[] | strings] | join(" ")') # present on NeoForge 39+
+else
+    NEOFORGE_JVM_OPTS=""
+fi
+
 echo "Downloading $NEOFORGE_LIB_NUM NeoForge libraries..."
 
 for name in $NEOFORGE_LIBS; do
@@ -140,9 +147,12 @@ for name in $NEOFORGE_LIBS; do
             rm $dest.pack
         fi
     fi
-    # use relative library path
-    if ! echo "$NEOFORGE_CP" | grep -q "libraries/$path/$file:" ; then # only add if it's not already in the path to avoid duplicates
-    	NEOFORGE_CP="${NEOFORGE_CP}libraries/$path/$file:"
+    # add the lib to the java classp path
+    if ! echo "${NEOFORGE_JVM_OPTS}" | grep -q "$path/$file" ; then # add only if it's not already in the jvm options (e.g. via -p)
+        if ! echo "$NEOFORGE_CP" | grep -q "libraries/$path/$file:" ; then # only add if it's not already in the path to avoid duplicates
+            # use relative library path
+       	    NEOFORGE_CP="${NEOFORGE_CP}libraries/$path/$file:"
+        fi
     fi
 done
 
@@ -170,12 +180,6 @@ if [[ $GAME_ARGS == "null" ]]; then
      # collect from game arguments
     MAINLINE_GAME_ARGS=$(cat versions/$MAINLINE_VERSION/$MAINLINE_VERSION.config | sed -n 's/GAME_ARGS="\(.*\)"/\1/p')
     GAME_ARGS="$MAINLINE_GAME_ARGS $(echo $VERSION_DETAILS | jq -r '[.arguments.game[] | strings] | join(" ")')"
-fi
-
-if [[ $(echo $VERSION_DETAILS | jq -r '.arguments.jvm') != "null" ]]; then
-    NEOFORGE_JVM_OPTS=$(echo $VERSION_DETAILS | jq -r  '[.arguments.jvm[] | strings] | join(" ")') # present on NeoForge 39+
-else
-    NEOFORGE_JVM_OPTS=""
 fi
 
 JVM_OPTS=$NEOFORGE_JVM_OPTS' -Xss1M -Djava.library.path=${natives_directory} -Dminecraft.launcher.brand=${launcher_name} -Dminecraft.launcher.version=${launcher_version} -Dlog4j.configurationFile=${log_path} -cp ${classpath}'
